@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Stripe from "stripe";
 import Restaurant, { MenuItemType } from "../models/restaurant";
+import Order from "../models/order";
 
 const STRIPE = new Stripe(process.env.STRIPE_API_KEY as string);
 const FRONTEND_URL = process.env.FRONTEND_URL as string;
@@ -32,6 +33,15 @@ const createCheckoutSession = async (req: Request, res: Response) => {
       throw new Error("Restaurant not found");
     }
 
+    const newOrder = new Order({
+      restaurant: restaurant,
+      user: req.userId,
+      status: "placed",
+      deliveryDetails: checkoutSessionRequest.deliveryDetails,
+      cartItems: checkoutSessionRequest.cartItems,
+      createdAt: new Date(),
+    });
+
     const lineItems = createLineItems(
       checkoutSessionRequest,
       restaurant.menuItems
@@ -39,7 +49,7 @@ const createCheckoutSession = async (req: Request, res: Response) => {
 
     const session = await createSession(
       lineItems,
-      "TEST_ORDER_ID",
+      newOrder._id.toString(),
       restaurant.deliveryPrice,
       restaurant._id.toString()
     );
@@ -48,6 +58,7 @@ const createCheckoutSession = async (req: Request, res: Response) => {
       return res.status(500).json({ message: "Error creating stripe session" });
     }
 
+    await newOrder.save();
     res.json({ url: session.url });
   } catch (error: any) {
     console.log(error);
@@ -71,7 +82,7 @@ const createLineItems = (
     const line_item: Stripe.Checkout.SessionCreateParams.LineItem = {
       price_data: {
         currency: "inr",
-        unit_amount: menuItem.price,
+        unit_amount: menuItem.price * 100,
         product_data: {
           name: menuItem.name,
         },
@@ -98,7 +109,7 @@ const createSession = async (
           display_name: "Delivery",
           type: "fixed_amount",
           fixed_amount: {
-            amount: deliveryPrice,
+            amount: deliveryPrice * 100,
             currency: "inr",
           },
         },
