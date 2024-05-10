@@ -12,6 +12,8 @@ dist
 dist-ssr
 *.local
 .env
+stripe_1.19.4_windows_x86_64
+stripe.exe
 
 # Editor directories and files
 .vscode/*
